@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Stickman Video Engine (1,500+ Lucide Props)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Lucide Vector Icons Library (All 1,500+ Icons) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Toolbar -->
+    <header class="toolbar">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <h1>Stickman Studio</h1>
+        <span class="badge" id="ratio-badge">9:16</span>
+      </div>
+      <div class="toolbar-actions">
+        <button id="btn-toggle-ratio" class="btn btn-secondary">Switch 16:9 / 9:16</button>
+        <button id="btn-play" class="btn btn-primary">▶ Play Video</button>
+        <button id="btn-export" class="btn btn-accent">⏺ Export Video</button>
+      </div>
+    </header>
+
+    <!-- Main Stage Canvas Area -->
+    <main class="stage-container">
+      <div class="video-wrapper" id="video-wrapper">
+        <canvas id="render-canvas"></canvas>
+
+        <!-- HTML Overlay Layer for Text & Vector Props -->
+        <div class="overlay-layer" id="overlay-layer">
+          <!-- Top Progress & Header Badges -->
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progress-bar"></div>
+          </div>
+          <div class="badge-container">
+            <span class="stage-badge" id="stage-badge">THE HOOK</span>
+          </div>
+
+          <!-- Dynamic 1,500+ Lucide Prop Stage -->
+          <div class="prop-stage" id="prop-stage">
+            <!-- Dynamically injected vector props from Lucide -->
+          </div>
+
+          <!-- Bottom Highlight Headline Card -->
+          <div class="headline-card-container">
+            <div class="headline-card" id="headline-card">
+              <span id="headline-text">STICKMAN VIDEO ENGINE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Timeline Scrubber & Details -->
+    <footer class="timeline-bar">
+      <div class="time-info">
+        <span id="time-current">0:00</span> / <span id="time-total">0:60</span>
+      </div>
+      <div class="scrubber-track" id="scrubber-track">
+        <div class="scrubber-progress" id="scrubber-progress"></div>
+      </div>
+      <div class="scene-indicators" id="scene-indicators">
+        <!-- 6 Scene Dots -->
+      </div>
+    </footer>
+  </div>
+
+  <script src="story.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>

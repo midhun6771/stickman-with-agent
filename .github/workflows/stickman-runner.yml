@@ -1,0 +1,165 @@
+name: Stickman AI Studio & Telegram Bot Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Execution mode (auto = 5h daemon scheduler, manual = targeted run)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - manual
+
+  push:
+    branches:
+      - main
+
+  schedule:
+    # 2 clean 5-hour daily windows (Indian Standard Time — IST: UTC + 5:30):
+    # Morning Window: 05:00 AM IST to 10:00 AM IST (11:30 PM UTC previous day)
+    - cron: '30 23 * * *'
+    # Evening Window: 05:00 PM IST to 10:00 PM IST (11:30 AM UTC)
+    - cron: '30 11 * * *'
+
+# ── Concurrency Control ──────────────────────────────────────────────────────
+# Only 1 instance of the Telegram Bot can run at any given time.
+# cancel-in-progress: true ensures old hanging jobs terminate cleanly when
+# the next scheduled window starts.
+concurrency:
+  group: stickman-bot
+  cancel-in-progress: true
+
+jobs:
+  run-stickman:
+    runs-on: ubuntu-latest
+    env:
+      TZ: "Asia/Kolkata"
+      GITHUB_CRON: ${{ github.event.schedule }}
+      DISPATCH_MODE: ${{ github.event.inputs.mode || 'auto' }}
+      PYTHONUNBUFFERED: "1"
+    timeout-minutes: 300   # 5-hour ceiling: runs 5:00 AM - 10:00 AM & 5:00 PM - 10:00 PM IST
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+
+    # ── 1. Checkout Repository ────────────────────────────────────────────────
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+    # ── 2. Set up Python ──────────────────────────────────────────────────────
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+
+    # ── 3. High-Performance FFmpeg (Full drawtext, fontconfig & libharfbuzz) ─
+    - name: Set up FFmpeg with drawtext & fontconfig
+      run: |
+        echo "🚀 Installing BtbN FFmpeg static build with full drawtext & libharfbuzz..."
+        curl -sL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz | tar -xJ -C /tmp
+        sudo mv /tmp/ffmpeg-*-linux64-gpl/bin/ffmpeg /usr/local/bin/
+        sudo mv /tmp/ffmpeg-*-linux64-gpl/bin/ffprobe /usr/local/bin/
+        rm -rf /tmp/ffmpeg-*-linux64-gpl
+        echo "✅ FFmpeg ready: $(ffmpeg -version | head -n 1)"
+        ffmpeg -filters | grep -w drawtext || (echo "❌ drawtext missing" && exit 1)
+
+    # ── 4. System & Font Dependencies ─────────────────────────────────────────
+    - name: Install System Utilities & Fonts
+      run: |
+        sudo apt-get update -y
+        # poppler-utils for manga PDF page extraction
+        # fonts-dejavu-core & fonts-liberation for subtitle & text overlay rendering
+        sudo apt-get install -y poppler-utils fonts-dejavu-core fonts-liberation
+        python -m pip install --upgrade pip
+        pip install --prefer-binary -r requirements.txt
+
+    # ── 5. Credential Injection & Environment Configuration ───────────────────
+    - name: Setup Environment Variables & Tokens
+      env:
+        ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT || secrets.ENV }}
+        GH_PAT: ${{ secrets.GH_PAT }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_ADMIN_ID: ${{ secrets.TELEGRAM_ADMIN_ID }}
+        TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID || vars.TELEGRAM_API_ID }}
+        TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH || vars.TELEGRAM_API_HASH }}
+        TELEGRAM_PUBLIC_GROUP_ID: ${{ secrets.TELEGRAM_PUBLIC_GROUP_ID || vars.TELEGRAM_PUBLIC_GROUP_ID }}
+        TELEGRAM_STORAGE_GROUP_ID: ${{ secrets.TELEGRAM_STORAGE_GROUP_ID || vars.TELEGRAM_STORAGE_GROUP_ID }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_KEY || secrets.GOOGLE_API_KEY }}
+        CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON || secrets.YOUTUBE_CLIENT_SECRET }}
+        TOKEN_JSON: ${{ secrets.TOKEN_JSON || secrets.YOUTUBE_TOKEN_JSON }}
+        TELEGRAM_CONFIG_JSON: ${{ secrets.TELEGRAM_CONFIG_JSON }}
+        IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID || secrets.IG_BUSINESS_ID }}
+        IG_BUSINESS_TOKEN: ${{ secrets.IG_BUSINESS_TOKEN || secrets.INSTAGRAM_ACCESS_TOKEN }}
+        META_PAGE_ID: ${{ secrets.META_PAGE_ID || secrets.FACEBOOK_PAGE_ID }}
+        META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN || secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+        TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+      run: |
+        mkdir -p Credentials/youtube
+        rm -f .env Credentials/.env
+
+        # Build clean .env file dynamically from injected secrets
+        python3 -c "
+        import os
+
+        env_file = '.env'
+        with open(env_file, 'w', encoding='utf-8') as f:
+            base_env = os.getenv('ENV_FILE_CONTENT', '').strip()
+            if base_env:
+                f.write(base_env + '\n')
+
+            mappings = {
+                'GH_PAT': os.getenv('GH_PAT'),
+                'TELEGRAM_BOT_TOKEN': os.getenv('TELEGRAM_BOT_TOKEN'),
+                'TELEGRAM_ADMIN_ID': os.getenv('TELEGRAM_ADMIN_ID'),
+                'TELEGRAM_API_ID': os.getenv('TELEGRAM_API_ID'),
+                'TELEGRAM_API_HASH': os.getenv('TELEGRAM_API_HASH'),
+                'TELEGRAM_PUBLIC_GROUP_ID': os.getenv('TELEGRAM_PUBLIC_GROUP_ID'),
+                'TELEGRAM_STORAGE_GROUP_ID': os.getenv('TELEGRAM_STORAGE_GROUP_ID'),
+                'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
+                'GOOGLE_API_KEY': os.getenv('GEMINI_API_KEY'),
+                'IG_BUSINESS_ACCOUNT_ID': os.getenv('IG_BUSINESS_ACCOUNT_ID'),
+                'IG_BUSINESS_TOKEN': os.getenv('IG_BUSINESS_TOKEN'),
+                'META_PAGE_ID': os.getenv('META_PAGE_ID'),
+                'META_PAGE_TOKEN': os.getenv('META_PAGE_TOKEN'),
+                'TIKTOK_ACCESS_TOKEN': os.getenv('TIKTOK_ACCESS_TOKEN'),
+                'CLIENT_SECRET_FILE': 'Credentials/youtube/client_secret.json',
+                'YOUTUBE_TOKEN_FILE': 'Credentials/youtube/token.json',
+            }
+            for k, v in mappings.items():
+                if v and v.strip():
+                    f.write(f'{k}={v.strip()}\n')
+        "
+
+        # YouTube OAuth files injection (if provided in secrets)
+        if [ -n "$CLIENT_SECRET_JSON" ]; then
+          echo "$CLIENT_SECRET_JSON" > Credentials/youtube/client_secret.json
+          echo "Injected YouTube client_secret.json"
+        fi
+        if [ -n "$TOKEN_JSON" ]; then
+          echo "$TOKEN_JSON" > Credentials/youtube/token.json
+          echo "Injected YouTube token.json"
+        fi
+
+        # Telegram JSON config (if provided)
+        if [ -n "$TELEGRAM_CONFIG_JSON" ]; then
+          echo "$TELEGRAM_CONFIG_JSON" > Credentials/telegram_config.json
+        fi
+
+        cp .env Credentials/.env
+        echo "✅ .env initialized and ready."
+
+    # ── 6. Run Master Stickman Bot & Video Studio ─────────────────────────────
+    - name: Run Stickman Telegram Bot & Video Service
+      run: |
+        echo "🤖 Starting Stickman Master Orchestration & Telegram Bot..."
+        # Runs python main.py — listens on Telegram and produces stickman videos
+        python -u main.py

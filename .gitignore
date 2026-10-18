@@ -1,0 +1,15 @@
+.env
+venv/
+output/
+temp/
+logs/
+scratch/
+graphify-out/
+Credentials/
+__pycache__/
+*.pyc
+*.mp4
+*.mp3
+*.wav
+*.pdf
+build_*

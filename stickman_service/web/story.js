@@ -1,0 +1,309 @@
+window.STORY_DATA = {
+  "title": "One Piece Chapter 1187 Breakdown",
+  "aspect_ratio": "9:16",
+  "accessory": "none",
+  "scenes": [
+    {
+      "scene_id": 1,
+      "stage": "hook",
+      "badge": "FRAUD ALERT",
+      "overlay": "LUFFY SOCKS THE ENEMY",
+      "accent_color": "crimson",
+      "background_style": "fire_storm",
+      "camera_shake": 0.5,
+      "action": "flame_strike",
+      "expression": "confident",
+      "characters": [
+        {
+          "name": "Monkey D. Luffy",
+          "action": "flame_strike",
+          "expression": "confident",
+          "direction": "right",
+          "speed": 1.3,
+          "x_offset": -0.32,
+          "visual_trait": "flame",
+          "attachments": {
+            "lead_foot": "flame"
+          },
+          "skin_tone": "tan",
+          "hair_style": "spiky_black",
+          "hair_color": "white",
+          "clothing_type": "shirt",
+          "clothing_color": "white",
+          "face_traits": [],
+          "motion_style": "snap_strike"
+        },
+        {
+          "name": "Saint Killingham",
+          "action": "fall",
+          "expression": "shocked",
+          "direction": "left",
+          "speed": 1.0,
+          "x_offset": 0.32,
+          "visual_trait": "horns",
+          "attachments": {
+            "lead_hand": "spear",
+            "head": "horns"
+          },
+          "skin_tone": "pale",
+          "hair_style": "long_hair",
+          "hair_color": "white",
+          "clothing_type": "knight_armor",
+          "clothing_color": "black",
+          "face_traits": [
+            "sharp_teeth"
+          ],
+          "motion_style": "recoil"
+        }
+      ],
+      "prop": {
+        "name": "zap",
+        "size": 85,
+        "animation": "anim-pulse"
+      },
+      "duration": 7.58,
+      "audio_url": "audio/scene_1.mp3"
+    },
+    {
+      "scene_id": 2,
+      "stage": "disrupt",
+      "badge": "ARROGANCE",
+      "overlay": "THE STIGMA TECHNIQUE",
+      "accent_color": "violet",
+      "background_style": "dark_vortex",
+      "camera_shake": 0.3,
+      "action": "channel_pose",
+      "expression": "menacing",
+      "characters": [
+        {
+          "name": "Saint Killingham",
+          "action": "channel_pose",
+          "expression": "menacing",
+          "direction": "left",
+          "speed": 1.0,
+          "x_offset": 0.0,
+          "visual_trait": "none",
+          "attachments": {
+            "lead_hand": "spear"
+          },
+          "skin_tone": "pale",
+          "hair_style": "long_hair",
+          "hair_color": "white",
+          "clothing_type": "knight_armor",
+          "clothing_color": "black",
+          "face_traits": [
+            "sinister_smile"
+          ],
+          "motion_style": "locked_in"
+        }
+      ],
+      "prop": {
+        "name": "skull",
+        "size": 80,
+        "animation": "anim-float"
+      },
+      "duration": 7.68,
+      "audio_url": "audio/scene_2.mp3"
+    },
+    {
+      "scene_id": 3,
+      "stage": "mechanism",
+      "badge": "EXPOSED",
+      "overlay": "THE WEAKNESS REVEALED",
+      "accent_color": "gold",
+      "background_style": "speed_lines",
+      "camera_shake": 0.4,
+      "action": "flame_strike",
+      "expression": "confident",
+      "characters": [
+        {
+          "name": "Sanji",
+          "action": "flame_strike",
+          "expression": "confident",
+          "direction": "right",
+          "speed": 1.2,
+          "x_offset": -0.32,
+          "visual_trait": "flame",
+          "attachments": {
+            "mouth": "cigarette",
+            "lead_foot": "flame"
+          },
+          "skin_tone": "fair",
+          "hair_style": "blonde_sweep",
+          "hair_color": "blonde",
+          "clothing_type": "suit",
+          "clothing_color": "black",
+          "face_traits": [
+            "curly_eyebrow",
+            "cigarette"
+          ],
+          "motion_style": "snap_strike"
+        },
+        {
+          "name": "Saint Killingham",
+          "action": "defend",
+          "expression": "shocked",
+          "direction": "left",
+          "speed": 1.0,
+          "x_offset": 0.32,
+          "visual_trait": "none",
+          "attachments": {
+            "lead_hand": "spear"
+          },
+          "skin_tone": "pale",
+          "hair_style": "long_hair",
+          "hair_color": "white",
+          "clothing_type": "knight_armor",
+          "clothing_color": "black",
+          "face_traits": [
+            "sharp_teeth"
+          ],
+          "motion_style": "recoil"
+        }
+      ],
+      "prop": {
+        "name": "target",
+        "size": 85,
+        "animation": "anim-pulse"
+      },
+      "duration": 7.68,
+      "audio_url": "audio/scene_3.mp3"
+    },
+    {
+      "scene_id": 4,
+      "stage": "mechanism",
+      "badge": "PANIC MODE",
+      "overlay": "SUMMONING THE RAIN GOD",
+      "accent_color": "crimson",
+      "background_style": "fire_storm",
+      "camera_shake": 0.6,
+      "action": "channel_pose",
+      "expression": "furious",
+      "characters": [
+        {
+          "name": "Saint Killingham",
+          "action": "channel_pose",
+          "expression": "furious",
+          "direction": "left",
+          "speed": 1.0,
+          "x_offset": 0.0,
+          "visual_trait": "none",
+          "attachments": {
+            "lead_hand": "spear"
+          },
+          "skin_tone": "pale",
+          "hair_style": "long_hair",
+          "hair_color": "white",
+          "clothing_type": "knight_armor",
+          "clothing_color": "black",
+          "face_traits": [
+            "sinister_smile"
+          ],
+          "motion_style": "locked_in"
+        }
+      ],
+      "prop": {
+        "name": "cloud-rain",
+        "size": 90,
+        "animation": "anim-bounce"
+      },
+      "duration": 8.76,
+      "audio_url": "audio/scene_4.mp3"
+    },
+    {
+      "scene_id": 5,
+      "stage": "truth",
+      "badge": "MIC DROP",
+      "overlay": "THE NAME IS LUFFY",
+      "accent_color": "gold",
+      "background_style": "clash_burst",
+      "camera_shake": 0.7,
+      "action": "punch",
+      "expression": "confident",
+      "characters": [
+        {
+          "name": "Monkey D. Luffy",
+          "action": "punch",
+          "expression": "confident",
+          "direction": "right",
+          "speed": 1.4,
+          "x_offset": -0.32,
+          "visual_trait": "none",
+          "attachments": {
+            "lead_hand": "flame"
+          },
+          "skin_tone": "tan",
+          "hair_style": "spiky_black",
+          "hair_color": "white",
+          "clothing_type": "shirt",
+          "clothing_color": "white",
+          "face_traits": [],
+          "motion_style": "snap_strike"
+        },
+        {
+          "name": "Saint Killingham",
+          "action": "fall",
+          "expression": "shocked",
+          "direction": "left",
+          "speed": 1.2,
+          "x_offset": 0.32,
+          "visual_trait": "none",
+          "attachments": {},
+          "skin_tone": "pale",
+          "hair_style": "long_hair",
+          "hair_color": "white",
+          "clothing_type": "knight_armor",
+          "clothing_color": "black",
+          "face_traits": [
+            "sharp_teeth"
+          ],
+          "motion_style": "recoil"
+        }
+      ],
+      "prop": {
+        "name": "trophy",
+        "size": 90,
+        "animation": "anim-bounce"
+      },
+      "duration": 7.56,
+      "audio_url": "audio/scene_5.mp3"
+    },
+    {
+      "scene_id": 6,
+      "stage": "elevation",
+      "badge": "DEBATE",
+      "overlay": "DROP YOUR THOUGHTS",
+      "accent_color": "cyan",
+      "background_style": "minimal_gradient",
+      "camera_shake": 0.1,
+      "action": "locked_in",
+      "expression": "confident",
+      "characters": [
+        {
+          "name": "Monkey D. Luffy",
+          "action": "locked_in",
+          "expression": "confident",
+          "direction": "right",
+          "speed": 1.0,
+          "x_offset": 0.0,
+          "visual_trait": "none",
+          "attachments": {},
+          "skin_tone": "tan",
+          "hair_style": "spiky_black",
+          "hair_color": "white",
+          "clothing_type": "shirt",
+          "clothing_color": "white",
+          "face_traits": [],
+          "motion_style": "combat_idle"
+        }
+      ],
+      "prop": {
+        "name": "message-square",
+        "size": 85,
+        "animation": "anim-pulse"
+      },
+      "duration": 3.0,
+      "audio_url": "audio/scene_6.mp3"
+    }
+  ]
+};
