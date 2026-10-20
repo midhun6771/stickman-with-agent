@@ -1,59 +1,80 @@
-name: Stickman AI Studio & Telegram Bot Runner
+name: Gemini Editor Runner
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Execution mode (auto = 5h daemon scheduler, manual = targeted run)'
+        description: 'Execution mode (auto = 6h daemon scheduler, manual = targeted run)'
         required: false
         default: 'auto'
         type: choice
         options:
           - auto
           - manual
+      platform:
+        description: 'Target platform to scrape'
+        required: false
+        default: 'all_available'
+        type: choice
+        options:
+          - all_available
+          - instagram
+          - youtube
+          - tiktok
+      target_accounts:
+        description: 'Target creator handle(s) (comma-separated, e.g. username)'
+        required: false
+        default: ''
+        type: string
+      target_url:
+        description: 'Source video URL to process (YouTube, TikTok, Instagram, direct link)'
+        required: false
+        default: ''
+        type: string
 
   push:
     branches:
       - main
 
   schedule:
-    # 2 clean 5-hour daily windows (Indian Standard Time — IST: UTC + 5:30):
-    # Morning Window: 05:00 AM IST to 10:00 AM IST (11:30 PM UTC previous day)
-    - cron: '30 23 * * *'
-    # Evening Window: 05:00 PM IST to 10:00 PM IST (11:30 AM UTC)
-    - cron: '30 11 * * *'
+    # 2 clean 4-hour windows (Indian Standard Time — IST):
+    # Morning window: 04:20 AM IST trigger -> 08:20 AM IST stop (4 hours)
+    - cron: '50 22 * * *'
+    # Evening window: 04:20 PM IST trigger -> 08:20 PM IST stop (4 hours)
+    - cron: '50 10 * * *'
 
 # ── Concurrency Control ──────────────────────────────────────────────────────
-# Only 1 instance of the Telegram Bot can run at any given time.
-# cancel-in-progress: true ensures old hanging jobs terminate cleanly when
-# the next scheduled window starts.
+# All runs share a single concurrency group.
+# cancel-in-progress: true — Cancels stale/overlapping runs immediately
+# so runs never queue up and exhaust Action minutes.
 concurrency:
-  group: stickman-bot
+  group: rawgrab-bot
   cancel-in-progress: true
 
 jobs:
-  run-stickman:
+  run-rawgrab:
     runs-on: ubuntu-latest
     env:
       TZ: "Asia/Kolkata"
       GITHUB_CRON: ${{ github.event.schedule }}
       DISPATCH_MODE: ${{ github.event.inputs.mode || 'auto' }}
-      PYTHONUNBUFFERED: "1"
-    timeout-minutes: 300   # 5-hour ceiling: runs 5:00 AM - 10:00 AM & 5:00 PM - 10:00 PM IST
+      MAX_RUN_HOURS: "3.95"
+    timeout-minutes: 245   # 4-hour daemon ceiling (strictly enforces 4h morning + 4h evening)
     permissions:
       contents: write
       actions: write
 
     steps:
 
-    # ── 1. Checkout Repository ────────────────────────────────────────────────
+    # ── 1. Checkout ───────────────────────────────────────────────────────────
     - name: Checkout Repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        # FIX: Prefer GH_PAT so the runner can push back to the repo
         token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
-    # ── 2. Set up Python ──────────────────────────────────────────────────────
+    # ── 2. Python ─────────────────────────────────────────────────────────────
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -61,8 +82,8 @@ jobs:
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
 
-    # ── 3. High-Performance FFmpeg (Full drawtext, fontconfig & libharfbuzz) ─
-    - name: Set up FFmpeg with drawtext & fontconfig
+    # ── 3. Set up High-Performance FFmpeg (with full drawtext & libharfbuzz) ──
+    - name: Set up FFmpeg with drawtext
       run: |
         echo "🚀 Installing BtbN FFmpeg static build with full drawtext & libharfbuzz..."
         curl -sL https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz | tar -xJ -C /tmp
@@ -72,41 +93,51 @@ jobs:
         echo "✅ FFmpeg ready: $(ffmpeg -version | head -n 1)"
         ffmpeg -filters | grep -w drawtext || (echo "❌ drawtext missing" && exit 1)
 
-    # ── 4. System & Font Dependencies ─────────────────────────────────────────
-    - name: Install System Utilities & Fonts
+    # ── 4. Cache AI Models (HuggingFace / Faster-Whisper) ─────────────────────
+    - name: Cache AI Models & Weights
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/huggingface
+          ~/.cache/whisper
+        key: ai-models-v1-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ai-models-v1-
+
+    # ── 5. System Utilities & Python Dependencies ───────────────────────────
+    - name: Install System & Python Dependencies
       run: |
-        sudo apt-get update -y
-        # poppler-utils for manga PDF page extraction
-        # fonts-dejavu-core & fonts-liberation for subtitle & text overlay rendering
-        sudo apt-get install -y poppler-utils fonts-dejavu-core fonts-liberation
+        sudo apt-get update -y && sudo apt-get install -y poppler-utils
         python -m pip install --upgrade pip
         pip install --prefer-binary -r requirements.txt
 
-    # ── 5. Credential Injection & Environment Configuration ───────────────────
+    # ── 5. Credential Injection ───────────────────────────────────────────────
     - name: Setup Environment Variables & Tokens
       env:
         ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT || secrets.ENV }}
         GH_PAT: ${{ secrets.GH_PAT }}
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_ADMIN_ID: ${{ secrets.TELEGRAM_ADMIN_ID }}
-        TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID || vars.TELEGRAM_API_ID }}
-        TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH || vars.TELEGRAM_API_HASH }}
         TELEGRAM_PUBLIC_GROUP_ID: ${{ secrets.TELEGRAM_PUBLIC_GROUP_ID || vars.TELEGRAM_PUBLIC_GROUP_ID }}
         TELEGRAM_STORAGE_GROUP_ID: ${{ secrets.TELEGRAM_STORAGE_GROUP_ID || vars.TELEGRAM_STORAGE_GROUP_ID }}
+        TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID || vars.TELEGRAM_API_ID }}
+        TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH || vars.TELEGRAM_API_HASH }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_KEY || secrets.GOOGLE_API_KEY }}
+        APIFY_TOKEN: ${{ secrets.APIFY_TOKEN || secrets.APIFY_API_TOKEN }}
         CLIENT_SECRET_JSON: ${{ secrets.CLIENT_SECRET_JSON || secrets.YOUTUBE_CLIENT_SECRET }}
         TOKEN_JSON: ${{ secrets.TOKEN_JSON || secrets.YOUTUBE_TOKEN_JSON }}
         TELEGRAM_CONFIG_JSON: ${{ secrets.TELEGRAM_CONFIG_JSON }}
-        IG_BUSINESS_ACCOUNT_ID: ${{ secrets.IG_BUSINESS_ACCOUNT_ID || secrets.IG_BUSINESS_ID }}
-        IG_BUSINESS_TOKEN: ${{ secrets.IG_BUSINESS_TOKEN || secrets.INSTAGRAM_ACCESS_TOKEN }}
-        META_PAGE_ID: ${{ secrets.META_PAGE_ID || secrets.FACEBOOK_PAGE_ID }}
-        META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN || secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
+        IG_BUSINESS_ID: ${{ secrets.IG_BUSINESS_ID || secrets.IG_BUSINESS_ACCOUNT_ID || secrets.META_IG_ACCOUNT_ID }}
+        INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN || secrets.META_ACCESS_TOKEN }}
+        FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID || secrets.META_PAGE_ID }}
+        FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN || secrets.META_PAGE_TOKEN }}
         TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+        BRAND_WATERMARK: ${{ secrets.BRAND_WATERMARK || secrets.BRAND_WATERMARK_TEXT }}
       run: |
-        mkdir -p Credentials/youtube
+        mkdir -p Credentials
         rm -f .env Credentials/.env
 
-        # Build clean .env file dynamically from injected secrets
+        # Build clean .env without toJson(secrets)
         python3 -c "
         import os
 
@@ -116,50 +147,162 @@ jobs:
             if base_env:
                 f.write(base_env + '\n')
 
+            # Write standard mapped environment variables if present
             mappings = {
                 'GH_PAT': os.getenv('GH_PAT'),
                 'TELEGRAM_BOT_TOKEN': os.getenv('TELEGRAM_BOT_TOKEN'),
                 'TELEGRAM_ADMIN_ID': os.getenv('TELEGRAM_ADMIN_ID'),
-                'TELEGRAM_API_ID': os.getenv('TELEGRAM_API_ID'),
-                'TELEGRAM_API_HASH': os.getenv('TELEGRAM_API_HASH'),
                 'TELEGRAM_PUBLIC_GROUP_ID': os.getenv('TELEGRAM_PUBLIC_GROUP_ID'),
                 'TELEGRAM_STORAGE_GROUP_ID': os.getenv('TELEGRAM_STORAGE_GROUP_ID'),
+                'TELEGRAM_API_ID': os.getenv('TELEGRAM_API_ID'),
+                'TELEGRAM_API_HASH': os.getenv('TELEGRAM_API_HASH'),
                 'GEMINI_API_KEY': os.getenv('GEMINI_API_KEY'),
                 'GOOGLE_API_KEY': os.getenv('GEMINI_API_KEY'),
-                'IG_BUSINESS_ACCOUNT_ID': os.getenv('IG_BUSINESS_ACCOUNT_ID'),
-                'IG_BUSINESS_TOKEN': os.getenv('IG_BUSINESS_TOKEN'),
-                'META_PAGE_ID': os.getenv('META_PAGE_ID'),
-                'META_PAGE_TOKEN': os.getenv('META_PAGE_TOKEN'),
+                'APIFY_API_TOKEN': os.getenv('APIFY_TOKEN'),
+                'APIFY_TOKEN': os.getenv('APIFY_TOKEN'),
+                'CLIENT_SECRET_JSON': os.getenv('CLIENT_SECRET_JSON'),
+                'TOKEN_JSON': os.getenv('TOKEN_JSON'),
+                'TELEGRAM_CONFIG_JSON': os.getenv('TELEGRAM_CONFIG_JSON'),
+                'IG_BUSINESS_ACCOUNT_ID': os.getenv('IG_BUSINESS_ID'),
+                'IG_BUSINESS_ID': os.getenv('IG_BUSINESS_ID'),
+                'INSTAGRAM_ACCESS_TOKEN': os.getenv('INSTAGRAM_ACCESS_TOKEN'),
+                'META_ACCESS_TOKEN': os.getenv('INSTAGRAM_ACCESS_TOKEN'),
+                'FACEBOOK_PAGE_ID': os.getenv('FACEBOOK_PAGE_ID'),
+                'META_PAGE_ID': os.getenv('FACEBOOK_PAGE_ID'),
+                'FACEBOOK_PAGE_ACCESS_TOKEN': os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN'),
+                'META_PAGE_TOKEN': os.getenv('FACEBOOK_PAGE_ACCESS_TOKEN'),
                 'TIKTOK_ACCESS_TOKEN': os.getenv('TIKTOK_ACCESS_TOKEN'),
-                'CLIENT_SECRET_FILE': 'Credentials/youtube/client_secret.json',
-                'YOUTUBE_TOKEN_FILE': 'Credentials/youtube/token.json',
+                'BRAND_WATERMARK_TEXT': os.getenv('BRAND_WATERMARK'),
             }
             for k, v in mappings.items():
                 if v and v.strip():
                     f.write(f'{k}={v.strip()}\n')
+
+            f.write('CLIENT_SECRET_FILE=Credentials/youtube/client_secret.json\n')
+            f.write('YOUTUBE_TOKEN_FILE=Credentials/youtube/token.json\n')
+            f.write('AUTO_PUBLISH_CLIPS=yes\n')
         "
 
-        # YouTube OAuth files injection (if provided in secrets)
+        # Telegram config
+        if [ -n "$TELEGRAM_CONFIG_JSON" ]; then
+          echo "$TELEGRAM_CONFIG_JSON" > Credentials/telegram_config.json
+          python3 -c "
+        import json, os
+        try:
+            raw_cfg = os.getenv('TELEGRAM_CONFIG_JSON', '').strip()
+            cfg = json.loads(raw_cfg) if raw_cfg.startswith('{') else {}
+            with open('.env', 'a', encoding='utf-8') as f:
+                for k, v in [
+                    ('TELEGRAM_API_ID', cfg.get('api_id') or cfg.get('TELEGRAM_API_ID') or cfg.get('telegram_api_id')),
+                    ('TELEGRAM_API_HASH', cfg.get('api_hash') or cfg.get('TELEGRAM_API_HASH') or cfg.get('telegram_api_hash')),
+                    ('TELEGRAM_BOT_TOKEN', cfg.get('bot_token') or cfg.get('TELEGRAM_BOT_TOKEN')),
+                    ('TELEGRAM_STORAGE_GROUP_ID', cfg.get('storage_group_id') or cfg.get('TELEGRAM_STORAGE_GROUP_ID') or cfg.get('group_id'))
+                ]:
+                    if v and not os.getenv(k):
+                        f.write(f'{k}={str(v).strip()}\n')
+        except Exception:
+            pass
+          "
+        fi
+
+        # Sync to Credentials/.env
+        cp .env Credentials/.env
+
+        # YouTube OAuth files
+        mkdir -p Credentials/youtube
         if [ -n "$CLIENT_SECRET_JSON" ]; then
           echo "$CLIENT_SECRET_JSON" > Credentials/youtube/client_secret.json
-          echo "Injected YouTube client_secret.json"
+          echo "$CLIENT_SECRET_JSON" > Credentials/client_secret.json
+          echo "Injected root default YT client_secret"
         fi
         if [ -n "$TOKEN_JSON" ]; then
           echo "$TOKEN_JSON" > Credentials/youtube/token.json
-          echo "Injected YouTube token.json"
+          echo "$TOKEN_JSON" > Credentials/token.json
+          echo "Injected root default YT token"
         fi
 
-        # Telegram JSON config (if provided)
-        if [ -n "$TELEGRAM_CONFIG_JSON" ]; then
-          echo "$TELEGRAM_CONFIG_JSON" > Credentials/telegram_config.json
-        fi
-
-        cp .env Credentials/.env
-        echo "✅ .env initialized and ready."
-
-    # ── 6. Run Master Stickman Bot & Video Studio ─────────────────────────────
-    - name: Run Stickman Telegram Bot & Video Service
+    # ── 6. Run RawGrab Engine ─────────────────────────────────────────────────
+    - name: Run RawGrab Engine
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_PAT: ${{ secrets.GH_PAT }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_ADMIN_ID: ${{ secrets.TELEGRAM_ADMIN_ID }}
+        TELEGRAM_STORAGE_GROUP_ID: ${{ secrets.TELEGRAM_STORAGE_GROUP_ID || vars.TELEGRAM_STORAGE_GROUP_ID }}
+        TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID || vars.TELEGRAM_API_ID }}
+        TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH || vars.TELEGRAM_API_HASH }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GEMINI_KEY || secrets.GOOGLE_API_KEY }}
+        DISPATCH_MODE: ${{ github.event.inputs.mode || 'auto' }}
+        DISPATCH_PLATFORM: ${{ github.event.inputs.platform || 'all_available' }}
+        DISPATCH_TARGET_ACCOUNTS: ${{ github.event.inputs.target_accounts || '' }}
+        DISPATCH_TARGET_URL: ${{ github.event.inputs.target_url || '' }}
+        PYTHONUNBUFFERED: "1"
       run: |
-        echo "🤖 Starting Stickman Master Orchestration & Telegram Bot..."
-        # Runs python main.py — listens on Telegram and produces stickman videos
+        # FIX: Store the spaced path in a variable so it is correctly quoted everywhere
+        LOCK_FILE="Phase_1/The jsons/Github_Actions_json/bot_lock.json"
+        # ── Scheduled-run fast-exit guard ────────────────────────────────────
+        if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ -f "$LOCK_FILE" ]; then
+          LOCK_EXPIRES=$(python3 -c "
+        import json, sys
+        try:
+            data = json.load(open('Phase_1/The jsons/Github_Actions_json/bot_lock.json'))
+            print(data.get('expires_at', 0))
+        except Exception:
+            print(0)
+        " 2>/dev/null || echo 0)
+          NOW=$(date +%s)
+          if [ "$LOCK_EXPIRES" -gt "$NOW" ]; then
+            MINS_LEFT=$(( (LOCK_EXPIRES - NOW) / 60 ))
+            echo "🔒 [CI GUARD] Active bot lock found (~${MINS_LEFT}m remaining). Skipping duplicate cron run."
+            exit 0
+          fi
+        fi
+        # ── Write bot_lock.json so overlapping crons self-skip ────────────────
+        mkdir -p "Phase_1/The jsons/Github_Actions_json"
+        python3 -c "
+        import json, time, os
+        lock = {'started_at': int(time.time()), 'expires_at': int(time.time()) + 14400}
+        with open('Phase_1/The jsons/Github_Actions_json/bot_lock.json', 'w') as f:
+            json.dump(lock, f)
+        print('🔐 Bot lock written (expires in ~240 min)')
+        "
+        # ─────────────────────────────────────────────────────────────────────
+        echo "🤖 Executing RawGrab daemon scheduler mode ($DISPATCH_MODE)..."
         python -u main.py
+
+    # ── 7. Commit State Back to Repo ─────────────────────────────────────────
+    - name: Commit Dedup State to Git
+      if: always()
+      continue-on-error: true
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        set +e
+        git config user.name  "RawGrab Bot"
+        git config user.email "rawgrab-bot@users.noreply.github.com"
+
+        # FIX: Authenticate git push via GH_PAT or GITHUB_TOKEN
+        if [ -n "$GH_PAT" ]; then
+          git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git"
+        else
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        fi
+
+        # Wipe leftover clip files before committing state
+        find downloads/ -name "*.mp4" -type f -delete 2>/dev/null || true
+        find downloads/ -empty -type d -delete 2>/dev/null || true
+
+        # Stage state files if present
+        # FIX: Use quoted path instead of backslash-escape (more reliable in run blocks)
+        git add -A "Phase_1/The jsons/Github_Actions_json/" "data/rejected_audio_blacklist.json" "data/published_registry.json" "data/scraper_rotation_pointer.json" "Content_Scraper_Modules/content_ledger.json" 2>/dev/null || true
+
+        if git diff --cached --quiet; then
+          echo "No state changes to commit."
+        else
+          git commit -m "ci: update state and bot lock [skip ci]"
+          git fetch origin main
+          git rebase origin/main --strategy-option=theirs || git rebase --abort
+          git push origin HEAD:main || echo "Push skipped (concurrent run or auth failure)"
+          echo "State committed."
+        fi
+        exit 0
